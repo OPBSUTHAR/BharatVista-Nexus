@@ -1,0 +1,7 @@
+database/*.db
+database/*.db-journal
+build/
+.env
+*.o
+*.exe
+.vscode/settings.local.json

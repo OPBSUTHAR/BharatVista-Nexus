@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/schema.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "allow": ["read", "edit", "write", "bash"],
+    "deny": ["bash:curl *SLDC*", "bash:curl *CEA*", "bash:*scada*"]
+  },
+  "tools": {
+    "note": "All ingestion must be via authorized api.data.gov.in endpoint with DATA_GOV_IN_API_KEY, rate-limited, cached to SQLite. Do not add scrapers for live critical-infrastructure telemetry."
+  },
+  "memory": {
+    "persist": ["AGENTS.md"],
+    "goal": "Pure-C high-performance open-data dashboard using only allowlisted public APIs (data.gov.in), SQLite cache, Leaflet/OSM frontend, runnable in VS Code cross-platform."
+  }
+}

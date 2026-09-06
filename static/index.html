@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Open Data Dashboard — Pure C</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
+body{margin:0;background:#0f172a;color:#e2e8f0}
+header{padding:16px 20px;background:#020617;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:16px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px}
+.card h3{margin:0 0 6px;font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em}
+.card .v{font-size:22px;font-weight:700}
+.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;padding:0 16px 16px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+#map{height:420px;border-radius:10px;border:1px solid #334155}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;overflow:auto}
+input,select,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 10px}
+button{cursor:pointer;background:#2563eb;border-color:#2563eb}
+button:disabled{opacity:.6}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#020617;padding:10px;border-radius:8px;max-height:320px;overflow:auto}
+.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:#334155}
+</style>
+</head>
+<body>
+<header>
+  <div><strong>Project C OSINT — Open Data Dashboard</strong> <span class="badge">C + SQLite + Leaflet/OSM</span></div>
+  <div style="font-size:12px;color:#94a3b8">Uses only <code>api.data.gov.in</code> with API key, cached to SQLite</div>
+</header>
+
+<div class="cards">
+  <div class="card"><h3>Status</h3><div class="v" id="status">—</div><div id="uptime" style="font-size:12px;color:#94a3b8"></div></div>
+  <div class="card"><h3>Cached Rows</h3><div class="v" id="rows">—</div></div>
+  <div class="card"><h3>Sector Filter</h3><select id="sector"><option value="general">general</option><option value="power">power</option><option value="agriculture">agriculture</option><option value="transport">transport</option><option value="space">space</option><option value="technology">technology</option></select></div>
+  <div class="card"><h3>API Key</h3><div style="font-size:12px;color:#94a3b8">Set <code>DATA_GOV_IN_API_KEY</code> on server, not in browser.</div></div>
+</div>
+
+<div class="grid">
+  <div>
+    <div id="map"></div>
+    <div class="panel" style="margin-top:12px">
+      <h3 style="margin:0 0 8px">Fetch from data.gov.in (authorized)</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input id="resource_id" placeholder="resource_id UUID (from data.gov.in)" style="flex:1;min-width:260px"/>
+        <input id="limit" type="number" value="5" min="1" max="100" style="width:80px"/>
+        <input id="offset" type="number" value="0" min="0" style="width:80px"/>
+        <button id="fetchBtn">POST /api/fetch</button>
+      </div>
+      <div style="font-size:12px;color:#94a3b8;margin-top:6px">Example: copy Resource ID from any dataset page on data.gov.in → API tab. Server calls <code>https://api.data.gov.in/resource/{id}?api-key=...</code> with rate-limit, caches to SQLite.</div>
+      <pre id="fetchOut">—</pre>
+    </div>
+  </div>
+  <div class="panel">
+    <h3 style="margin:0 0 8px">Cached Datasets <button id="refreshBtn" style="padding:4px 8px;font-size:12px">Refresh</button></h3>
+    <pre id="datasets">loading…</pre>
+  </div>
+</div>
+
+<script>
+const map = L.map('map').setView([22.5,78.9],5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:18}).addTo(map);
+
+async function health(){
+  try{
+    const r=await fetch('/api/health'); const j=await r.json();
+    document.getElementById('status').textContent=j.status;
+    document.getElementById('uptime').textContent='uptime '+j.uptime+'s';
+    document.getElementById('rows').textContent=j.cache_rows;
+  }catch(e){ document.getElementById('status').textContent='offline'; }
+}
+async function datasets(){
+  const r=await fetch('/api/datasets'); const j=await r.json();
+  document.getElementById('datasets').textContent=JSON.stringify(j,null,2);
+  // light demo: if any row payload has lat/lon, plot; otherwise no markers (privacy-safe)
+  map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); });
+  (j.rows||[]).slice(0,20).forEach(row=>{
+    try{
+      const payload = typeof row.payload==='string'? JSON.parse(row.payload): row.payload;
+      const recs = payload.records || payload.data || [];
+      recs.slice(0,5).forEach(rec=>{
+        const lat=parseFloat(rec.lat||rec.latitude||rec.y), lon=parseFloat(rec.lon||rec.longitude||rec.x);
+        if(!isNaN(lat)&&!isNaN(lon)&&lat>-90&&lat<90&&lon>-180&&lon<180){
+          L.marker([lat,lon]).addTo(map).bindPopup(`<b>${row.sector}</b><br/>${row.resource_id.slice(0,8)}…<br/>${(rec.district||rec.state||'')}`);
+        }
+      });
+    }catch(e){}
+  });
+}
+document.getElementById('refreshBtn').onclick=datasets;
+document.getElementById('fetchBtn').onclick=async()=>{
+  const resource_id=document.getElementById('resource_id').value.trim();
+  const limit=parseInt(document.getElementById('limit').value)||5;
+  const offset=parseInt(document.getElementById('offset').value)||0;
+  const sector=document.getElementById('sector').value;
+  const out=document.getElementById('fetchOut');
+  if(!resource_id){ out.textContent='Enter resource_id'; return; }
+  out.textContent='fetching…';
+  document.getElementById('fetchBtn').disabled=true;
+  try{
+    const r=await fetch('/api/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resource_id,limit,offset,sector})});
+    const t=await r.text();
+    out.textContent = `HTTP ${r.status}\n` + t.slice(0,6000);
+    if(r.ok) datasets(), health();
+  }catch(e){ out.textContent=String(e); }
+  document.getElementById('fetchBtn').disabled=false;
+};
+health(); datasets(); setInterval(health,5000);
+</script>
+</body>
+</html>

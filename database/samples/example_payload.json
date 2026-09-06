@@ -1,0 +1,6 @@
+{
+  "count": 1,
+  "records": [
+    {"state": "example", "district": "demo", "value": 123, "lat": "22.5", "lon": "78.9"}
+  ]
+}
