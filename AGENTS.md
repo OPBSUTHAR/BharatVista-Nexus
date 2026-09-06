@@ -3,7 +3,7 @@
 > This file is the canonical instruction for any agent / contributor working on this repo. Read it before writing code. It persists across sessions so you don't need to be re-told the goal.
 
 ## 1. Goal
-Build an enterprise-grade, high-performance **OSINT-style open-data dashboard in pure C** - backend in C, lightweight web frontend - runnable in VS Code, cross-platform (Linux / macOS / Windows via WSL or MinGW).
+Build **BharatVista Nexus** — an enterprise-grade, high-performance **open-data nexus for India & the world in pure C** - backend in C, lightweight web frontend - runnable in VS Code, cross-platform (Linux / macOS / Windows via WSL or MinGW). *Codename: project_C_osint; Public name: BharatVista Nexus.*
 
 **Scope constraint (CRITICAL):**
 - Use **only** officially published, freely licensed open data via authorized APIs (e.g. `api.data.gov.in` CKAN API with a registered `DATA_GOV_IN_API_KEY`).

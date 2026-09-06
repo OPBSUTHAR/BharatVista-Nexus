@@ -10,6 +10,6 @@
   },
   "memory": {
     "persist": ["AGENTS.md"],
-    "goal": "Pure-C high-performance open-data dashboard using only allowlisted public APIs (data.gov.in), SQLite cache, Leaflet/OSM frontend, runnable in VS Code cross-platform."
+    "goal": "BharatVista Nexus (codename project_C_osint) — Pure-C high-performance open-data nexus for India & world, only allowlisted public APIs (data.gov.in), SQLite cache, Leaflet/OSM, VS Code cross-platform."
   }
 }

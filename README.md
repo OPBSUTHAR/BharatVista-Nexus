@@ -1,6 +1,8 @@
-# Project C OSINT — Open Data Dashboard (Pure C)
+# BharatVista Nexus — Open Data Dashboard (Pure C)
 
-Enterprise-grade, high-performance **open-data dashboard** in pure C + lightweight web frontend. Uses **only** officially published open data via `api.data.gov.in` (CKAN API).
+*Codename: project_C_osint*
+
+Enterprise-grade, high-performance **open-data nexus** for India & the world — pure C backend + Leaflet/OSM frontend. Uses **only** officially published open data via `api.data.gov.in` (CKAN API).
 
 ## Features
 - **C backend** `src/server.c` — POSIX sockets + WinSock fallback, `pthreads`, CORS, libcurl, SQLite
