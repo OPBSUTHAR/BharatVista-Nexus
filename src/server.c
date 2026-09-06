@@ -26,6 +26,7 @@
 #include "db.h"
 #include "data_gov.h"
 #include "parser.h"
+#include "satellite.h"
 
 static time_t g_started;
 static const char *DB_PATH = "database/osint_cache.db";
@@ -82,6 +83,12 @@ static void handle_client(sock_t c){
         else { send_resp(c,200,ct,b,len); free(b); }
         CLOSE_SOCK(c); return;
     }
+    if(strcmp(method,"GET")==0 && strcmp(path,"/satellite.html")==0){
+        size_t len; const char *ct; char *b=read_file("static/satellite.html",&len,&ct);
+        if(!b){ send_resp(c,404,"text/plain","not found",9); }
+        else { send_resp(c,200,ct,b,len); free(b); }
+        CLOSE_SOCK(c); return;
+    }
     if(strncmp(path,"/static/",8)==0){
         char fpath[600]; snprintf(fpath,sizeof(fpath),".%s",path);
         size_t len; const char *ct; char *b=read_file(fpath,&len,&ct);
@@ -99,6 +106,34 @@ static void handle_client(sock_t c){
     if(strcmp(method,"GET")==0 && strncmp(path,"/api/datasets",13)==0){
         char *j=db_list_datasets_json();
         if(!j) j=strdup("{\"count\":0,\"rows\":[]}");
+        send_resp(c,200,"application/json",j,strlen(j));
+        free(j); CLOSE_SOCK(c); return;
+    }
+    if(strcmp(method,"GET")==0 && strncmp(path,"/api/satellites",14)==0){
+        // GET /api/satellites?group=stations  or  /api/satellites
+        char group[64]={0};
+        const char *q=strchr(path,'?');
+        if(q){ const char *g=strstr(q,"group="); if(g){ g+=6; size_t i=0; while(g[i] && g[i]!='&' && i<sizeof(group)-1){ group[i]=g[i]; i++; } group[i]='\0'; } }
+        char *j=satellite_list_cached_json(group[0]?group:NULL);
+        if(!j) j=strdup("{\"tles\":[]}");
+        send_resp(c,200,"application/json",j,strlen(j));
+        free(j); CLOSE_SOCK(c); return;
+    }
+    if(strcmp(method,"POST")==0 && strncmp(path,"/api/satellites/fetch",21)==0){
+        char *body=strstr(buf,"\r\n\r\n"); if(body) body+=4; else body="";
+        char group[64]="stations";
+        char tmp[64]={0};
+        if(json_extract_string(body,"group",tmp,sizeof(tmp))==0 && tmp[0]) strncpy(group,tmp,sizeof(group)-1);
+        // also support query ?group=
+        const char *q=strchr(path,'?'); if(q){ const char *g=strstr(q,"group="); if(g){ g+=6; size_t i=0; while(g[i] && g[i]!='&' && i<sizeof(group)-1){ group[i]=g[i]; i++; } group[i]='\0'; } }
+        char err[512]={0};
+        char *j=satellite_fetch_group(group,err,sizeof(err));
+        if(!j){
+            char ebody[768]; int blen=snprintf(ebody,sizeof(ebody),"{\"error\":\"%s\"}",err[0]?err:"fetch failed");
+            int code=strstr(err,"rate_limited")?429:400;
+            send_resp(c,code,"application/json",ebody,blen);
+            CLOSE_SOCK(c); return;
+        }
         send_resp(c,200,"application/json",j,strlen(j));
         free(j); CLOSE_SOCK(c); return;
     }
@@ -162,9 +197,10 @@ int main(int argc, char **argv){
     addr.sin_family=AF_INET; addr.sin_addr.s_addr=INADDR_ANY; addr.sin_port=htons(p);
     if(bind(srv,(struct sockaddr*)&addr,sizeof(addr))==SOCK_ERR){ perror("bind"); return 1; }
     if(listen(srv,32)==SOCK_ERR){ perror("listen"); return 1; }
-    printf("[+] C open-data server listening on :%d (DB=%s)\n",p,DB_PATH);
-    printf("[+] GET /  GET /api/health  GET /api/datasets  POST /api/fetch\n");
-    printf("[+] Set DATA_GOV_IN_API_KEY env var before POST /api/fetch\n");
+    printf("[+] BharatVista Nexus listening on :%d (DB=%s)\n",p,DB_PATH);
+    printf("[+] GET /  GET /satellite.html  GET /api/health  GET /api/datasets  POST /api/fetch\n");
+    printf("[+] GET /api/satellites?group=stations  POST /api/satellites/fetch {group}\n");
+    printf("[+] Celestrak TLE via satellite.c cached to tle_cache (rate 1/60s)\n");
 
     while(1){
         sock_t c=accept(srv,NULL,NULL);

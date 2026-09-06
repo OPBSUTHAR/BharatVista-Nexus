@@ -14,9 +14,9 @@ Build **BharatVista Nexus** — an enterprise-grade, high-performance **open-dat
 ## 2. Architecture (do not deviate without updating this file)
 ```
 BharatVista-Nexus/  (local: project_C_osint)
-├── src/          # C source: server.c, db.c, data_gov.c, geo.c, parser.c
-├── include/      # headers: db.h, data_gov.h, geo.h, parser.h, server.h
-├── static/       # index.html, app.js, style.css (Leaflet + OSM)
+├── src/          # C source: server.c, db.c, data_gov.c, geo.c, parser.c, satellite.c
+├── include/      # headers: db.h, data_gov.h, geo.h, parser.h, satellite.h, server.h
+├── static/       # index.html, satellite.html, app.js, style.css (Leaflet + OSM + satellite.js)
 ├── database/     # schema.sql, osint_cache.db (gitignored)
 ├── .vscode/      # tasks.json, launch.json
 ├── Makefile      # cross-platform build
@@ -32,6 +32,8 @@ BharatVista-Nexus/  (local: project_C_osint)
   - `GET /api/health` — `{status, uptime, cache_rows}`
   - `GET /api/datasets` — list cached records from SQLite
   - `POST /api/fetch` — body `{resource_id, limit, offset}` → server fetches from `api.data.gov.in/resource/{id}?api-key=...&format=json` via libcurl, caches to SQLite, returns result. Requires `DATA_GOV_IN_API_KEY` env var; rate-limited server-side.
+  - `GET /api/satellites?group=...` — list cached TLE (from `tle_cache` table)
+  - `POST /api/satellites/fetch` — body `{group:"stations"}` → server fetches from `celestrak.org/NORAD/elements/gp.php?GROUP={group}&FORMAT=tle`, caches to SQLite, returns JSON; rate-limited server-side (1/60s).
 - OSINT modules are **generic dataset viewers**, not sector scrapers: Power, Agriculture, Transport, Space are just tags/filters on top of cached `datasets` table.
 - Zero-copy parsing: `jsmn` or custom tokenizer, minimal heap.
 - Geospatial kernel: `geo.c` provides bounding-box filter and haversine on cached lat/lng — no bulk polygon ops on sensitive assets.
@@ -54,7 +56,8 @@ make            # or: make build  (gcc -O2 -std=c11 -pthread -lcurl -lsqlite3)
 Windows native: use WSL or MinGW-w64 (`mingw32-make`).
 
 ## 6. Data Sources (allowlist)
-- `api.data.gov.in` — requires key, `format=json`, respect `limit/offset` pagination.
+- `api.data.gov.in` — requires key, `format=json`, respect `limit/offset` pagination. ToS: https://data.gov.in/terms
+- `celestrak.org` (public TLE) — `https://celestrak.org/NORAD/elements/gp.php?GROUP=...&FORMAT=tle` or `.../TLE/api` — freely published TLE, attribution required. ToS: https://celestrak.org/NORAD/documentation/gp-data-formats.php . Cached server-side via `src/satellite.c`, rate-limited (≤1 fetch/60s per group). Propagation done client-side with `satellite.js` (SGP4) over cached TLE — no active tracking of sensitive missions beyond public catalog.
 - Any other source MUST be explicitly allowlisted here with its ToS link before adding code.
 
 ## 7. Git & Delivery

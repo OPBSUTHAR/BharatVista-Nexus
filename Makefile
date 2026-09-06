@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-O2 -std=c11 -pthread -Iinclude -Wall -Wextra
 LDFLAGS=-lcurl -lsqlite3 -lm -pthread
-SRC=src/server.c src/db.c src/data_gov.c src/geo.c src/parser.c
+SRC=src/server.c src/db.c src/data_gov.c src/geo.c src/parser.c src/satellite.c
 BIN=build/server
 
 all: $(BIN)

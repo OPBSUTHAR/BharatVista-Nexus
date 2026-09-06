@@ -19,7 +19,9 @@ int db_init(const char *path) {
         " fetched_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),"
         " limit_val INTEGER, offset_val INTEGER);"
         "CREATE INDEX IF NOT EXISTS idx_datasets_resource ON datasets(resource_id);"
-        "CREATE INDEX IF NOT EXISTS idx_datasets_sector ON datasets(sector);";
+        "CREATE INDEX IF NOT EXISTS idx_datasets_sector ON datasets(sector);"
+        "CREATE TABLE IF NOT EXISTS tle_cache(id INTEGER PRIMARY KEY AUTOINCREMENT,norad_id TEXT,name TEXT,line1 TEXT,line2 TEXT,grp TEXT,fetched_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')));"
+        "CREATE INDEX IF NOT EXISTS idx_tle_grp ON tle_cache(grp);";
     char *err=NULL;
     sqlite3_exec(g_db, ddl, 0,0,&err);
     if(err){ sqlite3_free(err); }

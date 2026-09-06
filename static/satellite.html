@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>BharatVista Nexus — Satellite Tracker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<style>
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
+body{margin:0;background:#0f172a;color:#e2e8f0}
+header{padding:14px 18px;background:#020617;border-bottom:1px solid #1e293b;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header a{color:#60a5fa;text-decoration:none}
+#map{height:62vh;border-bottom:1px solid #334155}
+.bar{padding:12px 16px;background:#1e293b;border-bottom:1px solid #334155;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:7px 10px}
+button{cursor:pointer;background:#2563eb;border-color:#2563eb}
+.log{padding:12px 16px;max-height:30vh;overflow:auto}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#020617;padding:10px;border-radius:8px}
+.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:#334155}
+</style>
+</head>
+<body>
+<header>
+  <strong>BharatVista Nexus</strong> <span class="badge">Satellite • Celestrak public TLE • satellite.js SGP4</span>
+  <span style="margin-left:auto;font-size:13px"><a href="/">← Dashboard</a> • <a href="https://celestrak.org" target="_blank">celestrak.org</a> (attribution)</span>
+</header>
+<div id="map"></div>
+<div class="bar">
+  <label>Group <select id="group">
+    <option value="stations">stations (ISS etc)</option>
+    <option value="active">active</option>
+    <option value="weather">weather</option>
+    <option value="gps-ops">gps-ops</option>
+    <option value="starlink">starlink</option>
+    <option value="visual">visual</option>
+  </select></label>
+  <button id="loadCached">Load cached</button>
+  <button id="fetchLive">Fetch live TLE</button>
+  <span id="status" style="font-size:12px;color:#94a3b8"></span>
+  <span style="margin-left:auto;font-size:12px;color:#94a3b8">Propagation client-side with <code>satellite.js</code> over cached TLE. Cached server-side via <code>POST /api/satellites/fetch</code> (1/60s).</span>
+</div>
+<div class="log">
+  <div id="count"></div>
+  <pre id="out">—</pre>
+</div>
+
+<script>
+const map = L.map('map').setView([20,78],3);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap | TLE © Celestrak',maxZoom:10}).addTo(map);
+const markers = L.layerGroup().addTo(map);
+let tles = [];
+
+function tleToMarker(tle){
+  try{
+    const satrec = satellite.twoline2satrec(tle.line1, tle.line2);
+    const now = new Date();
+    const posVel = satellite.propagate(satrec, now);
+    if(!posVel.position) return null;
+    const gmst = satellite.gstime(now);
+    const geo = satellite.eciToGeodetic(posVel.position, gmst);
+    const lat = satellite.degreesLat(geo.latitude);
+    const lon = satellite.degreesLong(geo.longitude);
+    const alt = geo.height; // km
+    return {lat,lon,alt,name:tle.name,norad:tle.norad_id};
+  }catch(e){ return null; }
+}
+
+function render(){
+  markers.clearLayers();
+  let plotted=0;
+  tles.slice(0,120).forEach(t=>{
+    const p=tleToMarker(t);
+    if(!p || isNaN(p.lat)||isNaN(p.lon)) return;
+    plotted++;
+    const m=L.circleMarker([p.lat,p.lon],{radius:4, color: p.name.includes('ISS')?'#22c55e':'#38bdf8', fillOpacity:0.8}).addTo(markers);
+    m.bindPopup(`<b>${p.name}</b><br/>NORAD ${p.norad}<br/>lat ${p.lat.toFixed(2)} lon ${p.lon.toFixed(2)}<br/>alt ${p.alt.toFixed(1)} km`);
+  });
+  document.getElementById('count').textContent = `${tles.length} TLE cached — plotted ${plotted} (cap 120) — updates every 3s via SGP4`;
+  if(plotted) map.setView(markers.getBounds().getCenter(), 3);
+}
+
+async function loadCached(){
+  const g=document.getElementById('group').value;
+  document.getElementById('status').textContent='loading…';
+  try{
+    const r=await fetch(`/api/satellites?group=${g}`);
+    const j=await r.json();
+    tles=j.tles||[];
+    document.getElementById('out').textContent=JSON.stringify(j,null,2).slice(0,8000);
+    document.getElementById('status').textContent=`cached ${tles.length} for ${g}`;
+    render();
+  }catch(e){ document.getElementById('status').textContent=String(e); }
+}
+async function fetchLive(){
+  const g=document.getElementById('group').value;
+  document.getElementById('status').textContent='fetching Celestrak…';
+  try{
+    const r=await fetch(`/api/satellites/fetch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:g})});
+    const t=await r.text();
+    document.getElementById('out').textContent=`HTTP ${r.status}\n`+t.slice(0,8000);
+    if(r.ok){ const j=JSON.parse(t); tles=j.tles||[]; render(); document.getElementById('status').textContent=`live ${tles.length} for ${g}`; }
+    else document.getElementById('status').textContent=`error ${r.status}`;
+  }catch(e){ document.getElementById('status').textContent=String(e); }
+}
+
+document.getElementById('loadCached').onclick=loadCached;
+document.getElementById('fetchLive').onclick=fetchLive;
+loadCached();
+setInterval(()=>{ if(tles.length) render(); },3000);
+</script>
+</body>
+</html>

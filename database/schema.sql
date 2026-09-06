@@ -21,3 +21,16 @@ CREATE TABLE IF NOT EXISTS fetch_log (
     ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
     resource_id TEXT
 );
+
+-- Satellite TLE cache (Celestrak public TLE, attribution required)
+CREATE TABLE IF NOT EXISTS tle_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    norad_id TEXT,
+    name TEXT,
+    line1 TEXT,
+    line2 TEXT,
+    grp TEXT,
+    fetched_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tle_grp ON tle_cache(grp);
+CREATE INDEX IF NOT EXISTS idx_tle_norad ON tle_cache(norad_id);
