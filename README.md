@@ -39,9 +39,23 @@ See `AGENTS.md:2` for architecture. Sector modules (power/agri/transport/space) 
 - Respects `robots.txt`, publisher ToS, rate-limits. Rate-limited server-side (`src/data_gov.c:rate_limit`).
 - Never commit `database/*.db`, `.env`, or keys. Sample payloads go in `database/samples/`.
 
+## Hosting
+
+**GitHub Pages (Step 1 — done):**
+- `.github/workflows/pages.yml` deploys `static/` (Leaflet + OSM dashboard) to Pages on every `git push` to `main`.
+- After push: GitHub → Settings → Pages → Source: **GitHub Actions**. URL appears as `https://opbsuthar.github.io/project_C_osint/`.
+- Pages is **static-only** — it serves `index.html` with mocked/cached data but cannot run the C server (`src/server.c`), `/api/*` or SQLite.
+
+**Real-time C backend (Step 2 — next):**
+Host `build/server` where long-running processes are allowed. Example targets:
+- Azure Container Apps / App Service (Docker: `gcc -lcurl -lsqlite3`), Fly.io `fly launch`, Render, or a VPS.
+- Set `DATA_GOV_IN_API_KEY` as env secret, open port `8080`, then point frontend `fetch('/api/...')` to `https://your-backend/api/...` (update `static/app.js` base URL) or put behind same domain via reverse proxy.
+- Keep rate-limit + caching per `AGENTS.md:3` — do NOT move backend to edge/serverless that bypasses SQLite cache.
+
 ## Git Remote
-Create repo at `https://github.com/OPBSUTHAR/project_C_osint` (or any name), then:
+Repo: `https://github.com/OPBSUTHAR/project_C_osint` — already pushed (`main`).
+
 ```bash
-git remote add origin https://github.com/OPBSUTHAR/project_C_osint.git
-git push -u origin main
+git remote -v
+git push origin main
 ```

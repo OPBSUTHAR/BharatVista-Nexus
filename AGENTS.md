@@ -58,7 +58,9 @@ Windows native: use WSL or MinGW-w64 (`mingw32-make`).
 - Any other source MUST be explicitly allowlisted here with its ToS link before adding code.
 
 ## 7. Git & Delivery
-- Remote: `https://github.com/OPBSUTHAR/<repo>` (create manually on GitHub, then `git remote add origin ... && git push -u origin main`).
+- Remote: `https://github.com/OPBSUTHAR/project_C_osint` — created via `gh repo create` and pushed (`main` branch).
+- GitHub Pages (Step 1): `.github/workflows/pages.yml` deploys `static/` via `actions/deploy-pages@v4` on `push: main`. Enable in GitHub → Settings → Pages → Source: GitHub Actions. Pages is static-only (no C server/SQLite).
+- Real-time hosting (Step 2): C server (`build/server`) must run on a container/VM host (Azure/Fly/Render/VPS) with `DATA_GOV_IN_API_KEY` as secret; point Pages frontend to that base URL if needed.
 - Never commit `database/*.db`, `.env`, or API keys. Commit `schema.sql` + sample JSON in `database/samples/`.
 
 ## 8. Task Tracking
