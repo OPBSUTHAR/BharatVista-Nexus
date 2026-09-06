@@ -3,112 +3,57 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>BharatVista Nexus — Satellite Tracker</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<title>BharatVista Nexus — Satellite Tracker v2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
 <style>
-*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
-body{margin:0;background:#0f172a;color:#e2e8f0}
-header{padding:14px 18px;background:#020617;border-bottom:1px solid #1e293b;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header a{color:#60a5fa;text-decoration:none}
-#map{height:62vh;border-bottom:1px solid #334155}
-.bar{padding:12px 16px;background:#1e293b;border-bottom:1px solid #334155;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-select,input,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:7px 10px}
-button{cursor:pointer;background:#2563eb;border-color:#2563eb}
-.log{padding:12px 16px;max-height:30vh;overflow:auto}
-pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#020617;padding:10px;border-radius:8px}
-.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:#334155}
+*{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial} body{margin:0;background:#020617;color:#e2e8f0}
+header{padding:10px 14px;background:#020617;border-bottom:1px solid #1e293b;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#map{height:55vh} #globe{height:55vh;display:none;background:#000}
+.bar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:#0f172a;border-bottom:1px solid #334155;align-items:center}
+select,button{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:6px 8px}
+button{background:#2563eb;border-color:#2563eb}
+.log{padding:10px;max-height:28vh;overflow:auto}
+pre{white-space:pre-wrap;word-break:break-word;font-size:11px;background:#0f172a;padding:8px;border-radius:8px}
 </style>
 </head>
 <body>
 <header>
-  <strong>BharatVista Nexus</strong> <span class="badge">Satellite • Celestrak public TLE • satellite.js SGP4</span>
-  <span style="margin-left:auto;font-size:13px"><a href="/">← Dashboard</a> • <a href="https://celestrak.org" target="_blank">celestrak.org</a> (attribution)</span>
+  <strong>BharatVista Nexus</strong> <span style="font-size:11px;background:#334155;padding:2px 7px;border-radius:999px">Satellite • Celestrak TLE • Globe.GL 3D</span>
+  <span style="margin-left:auto;font-size:13px"><a href="/" style="color:#60a5fa">← Dashboard</a> • Map: <select id="mapType"><option value="osm">OSM</option><option value="sat">Esri Satellite</option><option value="dark">Carto Dark</option><option value="topo">Topo</option></select> <button id="toggle3d">3D Globe</button> <a href="https://celestrak.org" target="_blank" style="color:#94a3b8">celestrak.org</a></span>
 </header>
-<div id="map"></div>
+<div id="map"></div><div id="globe"></div>
 <div class="bar">
-  <label>Group <select id="group">
-    <option value="stations">stations (ISS etc)</option>
-    <option value="active">active</option>
-    <option value="weather">weather</option>
-    <option value="gps-ops">gps-ops</option>
-    <option value="starlink">starlink</option>
-    <option value="visual">visual</option>
-  </select></label>
-  <button id="loadCached">Load cached</button>
-  <button id="fetchLive">Fetch live TLE</button>
-  <span id="status" style="font-size:12px;color:#94a3b8"></span>
-  <span style="margin-left:auto;font-size:12px;color:#94a3b8">Propagation client-side with <code>satellite.js</code> over cached TLE. Cached server-side via <code>POST /api/satellites/fetch</code> (1/60s).</span>
+  Group <select id="group"><option value="stations">stations</option><option value="active">active</option><option value="weather">weather</option><option value="gps-ops">gps-ops</option><option value="starlink">starlink</option><option value="visual">visual</option></select>
+  <button id="loadCached">Load cached</button><button id="fetchLive">Fetch live TLE</button>
+  <span id="status" style="font-size:11px;color:#94a3b8"></span>
+  <span id="details" style="margin-left:auto;font-size:11px;color:#94a3b8"></span>
 </div>
-<div class="log">
-  <div id="count"></div>
-  <pre id="out">—</pre>
-</div>
-
+<div class="log"><div id="count"></div><pre id="out">—</pre></div>
 <script>
-const map = L.map('map').setView([20,78],3);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap | TLE © Celestrak',maxZoom:10}).addTo(map);
-const markers = L.layerGroup().addTo(map);
-let tles = [];
-
-function tleToMarker(tle){
-  try{
-    const satrec = satellite.twoline2satrec(tle.line1, tle.line2);
-    const now = new Date();
-    const posVel = satellite.propagate(satrec, now);
-    if(!posVel.position) return null;
-    const gmst = satellite.gstime(now);
-    const geo = satellite.eciToGeodetic(posVel.position, gmst);
-    const lat = satellite.degreesLat(geo.latitude);
-    const lon = satellite.degreesLong(geo.longitude);
-    const alt = geo.height; // km
-    return {lat,lon,alt,name:tle.name,norad:tle.norad_id};
-  }catch(e){ return null; }
+let map, tiles={}, cur, markers, globe, tles=[], use3D=false;
+function initMap(){
+  map=L.map('map').setView([20,78],2);
+  tiles.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'});
+  tiles.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'© Esri'});
+  tiles.dark=L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© Carto'});
+  tiles.topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OSM Topo'});
+  cur=tiles.osm.addTo(map); markers=L.layerGroup().addTo(map);
+  map.on('moveend zoomend',()=>{ document.getElementById('details').textContent=`${document.getElementById('mapType').value} • ${map.getCenter().lat.toFixed(1)},${map.getCenter().lng.toFixed(1)} z${map.getZoom()} ${use3D?'3D':'2D'}`; });
 }
-
-function render(){
-  markers.clearLayers();
-  let plotted=0;
-  tles.slice(0,120).forEach(t=>{
-    const p=tleToMarker(t);
-    if(!p || isNaN(p.lat)||isNaN(p.lon)) return;
-    plotted++;
-    const m=L.circleMarker([p.lat,p.lon],{radius:4, color: p.name.includes('ISS')?'#22c55e':'#38bdf8', fillOpacity:0.8}).addTo(markers);
-    m.bindPopup(`<b>${p.name}</b><br/>NORAD ${p.norad}<br/>lat ${p.lat.toFixed(2)} lon ${p.lon.toFixed(2)}<br/>alt ${p.alt.toFixed(1)} km`);
-  });
-  document.getElementById('count').textContent = `${tles.length} TLE cached — plotted ${plotted} (cap 120) — updates every 3s via SGP4`;
-  if(plotted) map.setView(markers.getBounds().getCenter(), 3);
-}
-
-async function loadCached(){
-  const g=document.getElementById('group').value;
-  document.getElementById('status').textContent='loading…';
-  try{
-    const r=await fetch(`/api/satellites?group=${g}`);
-    const j=await r.json();
-    tles=j.tles||[];
-    document.getElementById('out').textContent=JSON.stringify(j,null,2).slice(0,8000);
-    document.getElementById('status').textContent=`cached ${tles.length} for ${g}`;
-    render();
-  }catch(e){ document.getElementById('status').textContent=String(e); }
-}
-async function fetchLive(){
-  const g=document.getElementById('group').value;
-  document.getElementById('status').textContent='fetching Celestrak…';
-  try{
-    const r=await fetch(`/api/satellites/fetch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:g})});
-    const t=await r.text();
-    document.getElementById('out').textContent=`HTTP ${r.status}\n`+t.slice(0,8000);
-    if(r.ok){ const j=JSON.parse(t); tles=j.tles||[]; render(); document.getElementById('status').textContent=`live ${tles.length} for ${g}`; }
-    else document.getElementById('status').textContent=`error ${r.status}`;
-  }catch(e){ document.getElementById('status').textContent=String(e); }
-}
-
-document.getElementById('loadCached').onclick=loadCached;
-document.getElementById('fetchLive').onclick=fetchLive;
-loadCached();
-setInterval(()=>{ if(tles.length) render(); },3000);
+function setMapType(t){ if(cur) map.removeLayer(cur); cur=(tiles[t]||tiles.osm).addTo(map); }
+function initGlobe(){ globe=Globe()(document.getElementById('globe')).globeImageUrl('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg').bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png').backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png').showAtmosphere(true).pointOfView({lat:20,lng:78,altitude:2.2}); globe.controls().autoRotate=true; globe.controls().autoRotateSpeed=0.35; }
+function tlePos(t){ try{ const r=satellite.twoline2satrec(t.line1,t.line2); const pv=satellite.propagate(r,new Date()); if(!pv.position) return null; const gmst=satellite.gstime(new Date()); const g=satellite.eciToGeodetic(pv.position,gmst); return {lat:satellite.degreesLat(g.latitude),lng:satellite.degreesLong(g.longitude),alt:g.height,name:t.name,norad:t.norad_id}; }catch(e){ return null; } }
+function render(){ markers.clearLayers(); let pts=[]; let n=0; tles.slice(0,150).forEach(t=>{ const p=tlePos(t); if(!p) return; n++; if(!use3D) L.circleMarker([p.lat,p.lng],{radius:4,color:p.name.includes('ISS')?'#22c55e':'#38bdf8',fillOpacity:0.85}).addTo(markers).bindPopup(`<b>${p.name}</b><br/>${p.norad}<br/>${p.lat.toFixed(2)},${p.lng.toFixed(2)} ${Math.round(p.alt)}km`); pts.push({lat:p.lat,lng:p.lng,alt:p.alt/6371, name:p.name,norad:p.norad, color:p.name.includes('ISS')?'#22c55e':'#60a5fa'}); }); document.getElementById('count').textContent=`${tles.length} TLE — plotted ${n} (cap 150) • ${use3D?'3D globe':'2D Leaflet'} • updates 3s`; if(use3D){ if(!globe) initGlobe(); globe.pointsData(pts).pointLat(d=>d.lat).pointLng(d=>d.lng).pointAltitude(d=>d.alt*0.02+0.01).pointColor(d=>d.color).pointRadius(0.55).pointLabel(d=>`${d.name} (${d.norad}) ${d.lat.toFixed(2)},${d.lng.toFixed(2)}`); } else if(n) try{ map.fitBounds(markers.getBounds().pad(0.2)); }catch(e){} }
+async function loadCached(){ const g=document.getElementById('group').value; document.getElementById('status').textContent='loading…'; try{ let r=await fetch(`/api/satellites?group=${g}`); if(!r.ok) throw new Error('no backend'); let j=await r.json(); tles=j.tles||[]; if(!tles.length) throw new Error('empty'); document.getElementById('status').textContent=`cached ${tles.length}`; document.getElementById('out').textContent=JSON.stringify(j,null,2).slice(0,8000); render(); return; }catch(e){ try{ let r2=await fetch('./samples/tle_stations.sample.json'); if(r2.ok){ let j2=await r2.json(); tles=j2.tles||[]; document.getElementById('status').textContent=`sample ${tles.length} (Pages static)`; document.getElementById('out').textContent='fallback sample — host build/server for live '+g; render(); return; } }catch(_){} document.getElementById('status').textContent='no backend — host server'; } }
+async function fetchLive(){ const g=document.getElementById('group').value; document.getElementById('status').textContent='fetching…'; try{ const r=await fetch(`/api/satellites/fetch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:g})}); const t=await r.text(); document.getElementById('out').textContent=`HTTP ${r.status}\n`+t.slice(0,8000); if(r.ok){ const j=JSON.parse(t); tles=j.tles||[]; render(); document.getElementById('status').textContent=`live ${tles.length}`; } else document.getElementById('status').textContent='error '+r.status; }catch(e){ document.getElementById('status').textContent=String(e); } }
+document.getElementById('mapType').onchange=e=>setMapType(e.target.value);
+document.getElementById('toggle3d').onclick=()=>{ use3D=!use3D; document.getElementById('toggle3d').textContent=use3D?'2D Leaflet':'3D Globe'; document.getElementById('map').style.display=use3D?'none':'block'; document.getElementById('globe').style.display=use3D?'block':'none'; if(use3D && !globe) initGlobe(); render(); document.getElementById('details').textContent=use3D?'3D Globe.GL • free space view':'2D Leaflet'; };
+document.getElementById('loadCached').onclick=loadCached; document.getElementById('fetchLive').onclick=fetchLive;
+initMap(); loadCached(); setInterval(()=>{ if(tles.length) render(); },3000);
 </script>
 </body>
 </html>

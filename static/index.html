@@ -3,111 +3,283 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>BharatVista Nexus — Open Data Platform</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<title>BharatVista Nexus — Open Data Platform v2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/globe.gl@2.32.0/dist/globe.gl.min.js"></script>
 <style>
 *{box-sizing:border-box;font-family:system-ui,Segoe UI,Roboto,Arial}
 body{margin:0;background:#0f172a;color:#e2e8f0}
-header{padding:16px 20px;background:#020617;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:16px}
-.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px}
-.card h3{margin:0 0 6px;font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em}
-.card .v{font-size:22px;font-weight:700}
-.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;padding:0 16px 16px}
-@media(max-width:900px){.grid{grid-template-columns:1fr}}
-#map{height:420px;border-radius:10px;border:1px solid #334155}
-.panel{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:14px;overflow:auto}
-input,select,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 10px}
+header{padding:12px 16px;background:#020617;border-bottom:1px solid #1e293b;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{padding:6px 10px;border-radius:999px;border:1px solid #334155;background:#1e293b;cursor:pointer;font-size:13px}
+.tab.active{background:#2563eb;border-color:#2563eb;color:white}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:12px}
+.card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px}
+.card h3{margin:0 0 4px;font-size:11px;color:#94a3b8;letter-spacing:.06em;text-transform:uppercase}
+.card .v{font-size:20px;font-weight:700}
+.grid{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;padding:0 12px 12px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}}
+#mapWrap{border:1px solid #334155;border-radius:10px;overflow:hidden;background:#020617}
+#map{height:500px}
+#globe{height:500px;display:none;background:#000}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;padding:8px;background:#0b1220;border-top:1px solid #334155;align-items:center}
+select,input,button{background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:6px 8px;font-size:13px}
 button{cursor:pointer;background:#2563eb;border-color:#2563eb}
-button:disabled{opacity:.6}
-pre{white-space:pre-wrap;word-break:break-word;font-size:12px;background:#020617;padding:10px;border-radius:8px;max-height:320px;overflow:auto}
-.badge{font-size:11px;padding:3px 8px;border-radius:999px;background:#334155}
+button.sec{background:#334155;border-color:#334155}
+.panel{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px;overflow:auto}
+pre{white-space:pre-wrap;word-break:break-word;font-size:11px;background:#020617;padding:8px;border-radius:8px;max-height:300px;overflow:auto}
+.badge{font-size:10px;padding:2px 7px;border-radius:999px;background:#334155}
+.mapDetails{font-size:11px;color:#94a3b8;padding:6px 8px;background:#020617;border-top:1px solid #1e293b}
+.sectorPanel{display:none}
+.sectorPanel.active{display:block}
 </style>
 </head>
 <body>
 <header>
-  <div><strong>BharatVista Nexus</strong> <span class="badge">Bharat • India & World • C + SQLite + Leaflet/OSM</span> <a href="/satellite.html" style="margin-left:10px;color:#60a5fa;font-size:13px">🛰 Satellite Tracker →</a></div>
-  <div style="font-size:12px;color:#94a3b8">Uses only <code>api.data.gov.in</code> + <code>celestrak.org</code> (public TLE), cached to SQLite</div>
+  <div><strong>BharatVista Nexus</strong> <span class="badge">v2 • C + SQLite + Leaflet + Globe.GL</span> <span style="margin-left:8px;font-size:11px;color:#94a3b8">Bharat & World • data.gov.in + Celestrak</span></div>
+  <div style="margin-left:auto;display:flex;gap:6px;align-items:center"><a href="/satellite.html" style="color:#60a5fa;font-size:13px">🛰 Full Satellite View</a><span style="font-size:10px;color:#94a3b8" id="buildInfo">Pages: static • /api needs backend</span></div>
 </header>
 
+<div class="tabs" style="padding:8px 12px;background:#0f172a;border-bottom:1px solid #1e293b">
+  <div class="tab active" data-sector="general">General</div>
+  <div class="tab" data-sector="power">Power</div>
+  <div class="tab" data-sector="agriculture">Agriculture</div>
+  <div class="tab" data-sector="transport">Transport</div>
+  <div class="tab" data-sector="space">Space / Satellites</div>
+  <div class="tab" data-sector="technology">Technology</div>
+  <span style="margin-left:auto;font-size:11px;color:#94a3b8">Sector filter changes map, panels & viewer</span>
+</div>
+
 <div class="cards">
-  <div class="card"><h3>Status</h3><div class="v" id="status">—</div><div id="uptime" style="font-size:12px;color:#94a3b8"></div></div>
+  <div class="card"><h3>Status</h3><div class="v" id="status">—</div><div id="uptime" style="font-size:11px;color:#94a3b8"></div></div>
   <div class="card"><h3>Cached Rows</h3><div class="v" id="rows">—</div></div>
-  <div class="card"><h3>Sector Filter</h3><select id="sector"><option value="general">general</option><option value="power">power</option><option value="agriculture">agriculture</option><option value="transport">transport</option><option value="space">space</option><option value="technology">technology</option></select></div>
-  <div class="card"><h3>API Key</h3><div style="font-size:12px;color:#94a3b8">Set <code>DATA_GOV_IN_API_KEY</code> on server, not in browser.</div></div>
+  <div class="card"><h3>Satellites Cached</h3><div class="v" id="satCount">—</div><div id="satInfo" style="font-size:11px;color:#94a3b8"></div></div>
+  <div class="card"><h3>View</h3><div style="display:flex;gap:6px"><select id="mapType"><option value="osm">OSM</option><option value="sat">Esri Satellite</option><option value="dark">Carto Dark</option><option value="topo">Topo</option><option value="terrain">Terrain</option></select><button id="toggle3d" class="sec">3D Globe</button></div></div>
 </div>
 
 <div class="grid">
   <div>
-    <div id="map"></div>
-    <div class="panel" style="margin-top:12px">
-      <h3 style="margin:0 0 8px">Fetch from data.gov.in (authorized)</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <input id="resource_id" placeholder="resource_id UUID (from data.gov.in)" style="flex:1;min-width:260px"/>
-        <input id="limit" type="number" value="5" min="1" max="100" style="width:80px"/>
-        <input id="offset" type="number" value="0" min="0" style="width:80px"/>
+    <div id="mapWrap">
+      <div id="map"></div>
+      <div id="globe"></div>
+      <div class="toolbar">
+        <label style="font-size:12px">Group <select id="group"><option value="stations">stations</option><option value="active">active</option><option value="weather">weather</option><option value="gps-ops">gps-ops</option><option value="starlink">starlink</option><option value="visual">visual</option></select></label>
+        <button id="loadCached" class="sec">Load cached</button>
+        <button id="fetchLive">Fetch live TLE</button>
+        <span id="satStatus" style="font-size:11px;color:#94a3b8"></span>
+      </div>
+      <div class="mapDetails" id="mapDetails">Map: OSM • Center 22.5,78.9 • Zoom 5 • 2D Leaflet</div>
+    </div>
+
+    <!-- sector panels -->
+    <div id="panel-general" class="panel sectorPanel active" style="margin-top:10px">
+      <h3 style="margin:0 0 6px">Fetch from data.gov.in (authorized)</h3>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <input id="resource_id" placeholder="resource_id UUID" style="flex:1;min-width:200px"/>
+        <input id="limit" type="number" value="5" style="width:70px"/>
+        <input id="offset" type="number" value="0" style="width:70px"/>
         <button id="fetchBtn">POST /api/fetch</button>
       </div>
-      <div style="font-size:12px;color:#94a3b8;margin-top:6px">Example: copy Resource ID from any dataset page on data.gov.in → API tab. Server calls <code>https://api.data.gov.in/resource/{id}?api-key=...</code> with rate-limit, caches to SQLite.</div>
+      <div style="font-size:11px;color:#94a3b8;margin-top:4px">Server caches to SQLite. On Pages static, use local backend URL.</div>
       <pre id="fetchOut">—</pre>
     </div>
+    <div id="panel-power" class="panel sectorPanel" style="margin-top:10px"><h3>Power Sector</h3><p style="font-size:12px;color:#94a3b8">Filter shows power datasets from <code>/api/datasets?sector=power</code>. Map overlays substation markers when payload contains lat/lon (demo: synthetic). No live SCADA scraping — only allowlisted catalog data.</p><pre id="panelPowerOut">Select Power tab → Refresh datasets.</pre></div>
+    <div id="panel-agriculture" class="panel sectorPanel" style="margin-top:10px"><h3>Agriculture</h3><p style="font-size:12px;color:#94a3b8">District land-use / crop records from data.gov.in. Geo filter uses haversine/bbox on cached coordinates.</p><pre id="panelAgriOut">—</pre></div>
+    <div id="panel-transport" class="panel sectorPanel" style="margin-top:10px"><h3>Transport</h3><p style="font-size:12px;color:#94a3b8">GTFS-style vectors if published as open data. Displayed as lines/markers — no live vehicle scraping.</p><pre id="panelTransOut">—</pre></div>
+    <div id="panel-space" class="panel sectorPanel active" style="margin-top:10px">
+      <h3>Space — Real-time Ground Track</h3>
+      <p style="font-size:11px;color:#94a3b8">TLE from Celestrak (public, attribution). Propagation with <code>satellite.js</code> SGP4. Backend caches TLE (1/60s). On static Pages, fallback to sample + direct Celestrak JSON if CORS allows.</p>
+      <pre id="spaceOut">Load cached satellites to see ground track. On globe, satellites shown as points above Earth.</pre>
+    </div>
+    <div id="panel-technology" class="panel sectorPanel" style="margin-top:10px"><h3>Technology</h3><p style="font-size:12px;color:#94a3b8">Tech datasets as generic tags. Map shows cluster markers when geo present.</p><pre id="panelTechOut">—</pre></div>
   </div>
   <div class="panel">
-    <h3 style="margin:0 0 8px">Cached Datasets <button id="refreshBtn" style="padding:4px 8px;font-size:12px">Refresh</button></h3>
+    <h3 style="margin:0 0 6px">Cached Datasets <button id="refreshBtn" class="sec" style="padding:3px 7px;font-size:11px">Refresh</button> <span id="sectorBadge" class="badge">general</span></h3>
     <pre id="datasets">loading…</pre>
   </div>
 </div>
 
 <script>
-const map = L.map('map').setView([22.5,78.9],5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors',maxZoom:18}).addTo(map);
+let currentSector='general';
+let map, tileLayers={}, currentTiles, markers, globe, globeData=[], use3D=false;
+let tles=[];
 
-async function health(){
-  try{
-    const r=await fetch('/api/health'); const j=await r.json();
-    document.getElementById('status').textContent=j.status;
-    document.getElementById('uptime').textContent='uptime '+j.uptime+'s';
-    document.getElementById('rows').textContent=j.cache_rows;
-  }catch(e){ document.getElementById('status').textContent='offline'; }
+// --- Map types (free, no key) ---
+function initMap(){
+  map = L.map('map').setView([22.5,78.9],4);
+  tileLayers.osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19});
+  tileLayers.sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Tiles © Esri'});
+  tileLayers.dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© CartoDB'});
+  tileLayers.topo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OSM Topo'});
+  tileLayers.terrain = L.tileLayer('https://{s}.tile.stamen.com/terrain/{z}/{x}/{y}.jpg',{attribution:'© Stamen'});
+  currentTiles = tileLayers.osm.addTo(map);
+  markers = L.layerGroup().addTo(map);
+  map.on('moveend zoomend', updateMapDetails);
+  updateMapDetails();
 }
-async function datasets(){
-  const r=await fetch('/api/datasets'); const j=await r.json();
-  document.getElementById('datasets').textContent=JSON.stringify(j,null,2);
-  // light demo: if any row payload has lat/lon, plot; otherwise no markers (privacy-safe)
-  map.eachLayer(l=>{ if(l instanceof L.Marker) map.removeLayer(l); });
-  (j.rows||[]).slice(0,20).forEach(row=>{
-    try{
-      const payload = typeof row.payload==='string'? JSON.parse(row.payload): row.payload;
-      const recs = payload.records || payload.data || [];
-      recs.slice(0,5).forEach(rec=>{
-        const lat=parseFloat(rec.lat||rec.latitude||rec.y), lon=parseFloat(rec.lon||rec.longitude||rec.x);
-        if(!isNaN(lat)&&!isNaN(lon)&&lat>-90&&lat<90&&lon>-180&&lon<180){
-          L.marker([lat,lon]).addTo(map).bindPopup(`<b>${row.sector}</b><br/>${row.resource_id.slice(0,8)}…<br/>${(rec.district||rec.state||'')}`);
-        }
-      });
-    }catch(e){}
+function setMapType(t){
+  if(currentTiles) map.removeLayer(currentTiles);
+  currentTiles = (tileLayers[t]||tileLayers.osm).addTo(map);
+  updateMapDetails();
+}
+function updateMapDetails(){
+  if(!map) return;
+  const c=map.getCenter(), z=map.getZoom();
+  const typ=document.getElementById('mapType').value;
+  const mode=use3D?'3D Globe.GL':'2D Leaflet';
+  document.getElementById('mapDetails').textContent=`Map: ${typ} • Center ${c.lat.toFixed(2)},${c.lng.toFixed(2)} • Zoom ${z} • ${mode} • ${tles.length} sats • Sector: ${currentSector}`;
+}
+
+// --- Globe ---
+function initGlobe(){
+  globe = Globe()(document.getElementById('globe'))
+    .globeImageUrl('//unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+    .bumpImageUrl('//unpkg.com/three-globe/example/img/earth-topology.png')
+    .backgroundImageUrl('//unpkg.com/three-globe/example/img/night-sky.png')
+    .showAtmosphere(true)
+    .pointOfView({lat:22.5,lng:78.9,altitude:2.2});
+  globe.controls().autoRotate=true; globe.controls().autoRotateSpeed=0.35;
+}
+function updateGlobe(){
+  const pts=[];
+  tles.slice(0,200).forEach(t=>{
+    const p=tleToPos(t);
+    if(!p) return;
+    pts.push({lat:p.lat,lng:p.lon,alt:p.alt/6371, name:p.name, norad:p.norad, color: p.name.includes('ISS')?'#22c55e':'#60a5fa'});
   });
+  globeData=pts;
+  globe.pointsData(pts).pointLat(d=>d.lat).pointLng(d=>d.lng).pointAltitude(d=>d.alt*0.02+0.01).pointColor(d=>d.color).pointRadius(0.6).pointsMerge(false)
+    .pointLabel(d=>`${d.name} (${d.norad})<br/>${d.lat.toFixed(2)},${d.lng.toFixed(2)} alt ${Math.round(d.alt)}km`);
 }
+
+function tleToPos(tle){
+  try{
+    const satrec=satellite.twoline2satrec(tle.line1,tle.line2);
+    const pv=satellite.propagate(satrec,new Date());
+    if(!pv.position) return null;
+    const gmst=satellite.gstime(new Date());
+    const geo=satellite.eciToGeodetic(pv.position,gmst);
+    return {lat:satellite.degreesLat(geo.latitude), lng:satellite.degreesLong(geo.longitude), alt:geo.height, name:tle.name, norad:tle.norad_id};
+  }catch(e){ return null; }
+}
+
+// --- Satellite render 2D ---
+function renderSatellites(){
+  markers.clearLayers();
+  let plotted=0;
+  tles.slice(0,120).forEach(t=>{
+    const p=tleToPos(t);
+    if(!p||isNaN(p.lat)) return;
+    plotted++;
+    L.circleMarker([p.lat,p.lon],{radius:4,color:p.name.includes('ISS')?'#22c55e':'#38bdf8',fillOpacity:0.85}).addTo(markers)
+      .bindPopup(`<b>${p.name}</b><br/>NORAD ${p.norad}<br/>${p.lat.toFixed(2)},${p.lon.toFixed(2)}<br/>${Math.round(p.alt)} km`);
+  });
+  document.getElementById('satCount').textContent=tles.length;
+  document.getElementById('satInfo').textContent=`plotted ${plotted} (cap 120) • ISS green`;
+  document.getElementById('spaceOut').textContent=`${tles.length} TLE loaded — plotted ${plotted}. 3D globe shows up to 200 pts. Updates every 3s via SGP4.\n`+ tles.slice(0,5).map(t=>t.name).join('\n');
+  updateMapDetails();
+  if(use3D) updateGlobe();
+  else if(plotted) { try{ map.fitBounds(markers.getBounds().pad(0.2)); }catch(e){} }
+}
+
+async function loadCached(){
+  const g=document.getElementById('group').value;
+  document.getElementById('satStatus').textContent='loading…';
+  try{
+    let r=await fetch(`/api/satellites?group=${g}`);
+    if(!r.ok) throw new Error('backend '+r.status);
+    let j=await r.json();
+    tles=j.tles||[];
+    if(!tles.length) throw new Error('empty');
+    document.getElementById('satStatus').textContent=`cached ${tles.length} for ${g}`;
+    renderSatellites();
+    return;
+  }catch(e){
+    // fallback: try local sample or direct Celestrak JSON (if CORS)
+    document.getElementById('satStatus').textContent='fallback sample…';
+    try{
+      let r2=await fetch('./samples/tle_stations.sample.json');
+      if(r2.ok){ let j2=await r2.json(); tles=j2.tles||[]; renderSatellites(); document.getElementById('satStatus').textContent=`sample ${tles.length} (Pages static)`; return; }
+    }catch(_){}
+    document.getElementById('satStatus').textContent='no backend — host build/server for live TLE';
+  }
+}
+async function fetchLive(){
+  const g=document.getElementById('group').value;
+  document.getElementById('satStatus').textContent='fetching…';
+  try{
+    const r=await fetch(`/api/satellites/fetch`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({group:g})});
+    const t=await r.text();
+    if(!r.ok){ document.getElementById('satStatus').textContent=`error ${r.status}: ${t.slice(0,120)}`; document.getElementById('spaceOut').textContent=t.slice(0,4000); return; }
+    const j=JSON.parse(t); tles=j.tles||[]; renderSatellites(); document.getElementById('satStatus').textContent=`live ${tles.length} for ${g}`;
+  }catch(e){ document.getElementById('satStatus').textContent=String(e); }
+}
+
+// --- health/datasets ---
+async function health(){ try{ const r=await fetch('/api/health'); const j=await r.json(); document.getElementById('status').textContent=j.status; document.getElementById('uptime').textContent='uptime '+j.uptime+'s'; document.getElementById('rows').textContent=j.cache_rows; document.getElementById('buildInfo').textContent='backend: connected'; }catch(e){ document.getElementById('status').textContent='static (Pages)'; document.getElementById('uptime').textContent='no /api — host server for live'; document.getElementById('buildInfo').textContent='Pages: static — no /api'; } }
+async function datasets(){
+  try{
+    const r=await fetch('/api/datasets'); const j=await r.json();
+    // filter by sector for UI
+    const filtered = currentSector==='general'? j : {count: j.rows.filter(x=>x.sector===currentSector).length, rows: j.rows.filter(x=>x.sector===currentSector)};
+    const toShow = currentSector==='general'? j : filtered;
+    document.getElementById('datasets').textContent=JSON.stringify(toShow,null,2).slice(0,8000);
+    document.getElementById('sectorBadge').textContent=currentSector;
+    // also update sector panels
+    if(currentSector!=='space' && currentSector!=='general'){
+      const outId='panel'+currentSector.charAt(0).toUpperCase()+currentSector.slice(1)+'Out';
+      // maps panel ids: power→panelPowerOut etc. Use generic fallback
+    }
+    // plot dataset lat/lon except when space (space uses satellites)
+    if(currentSector!=='space'){
+      markers.clearLayers();
+      (toShow.rows||[]).slice(0,25).forEach(row=>{
+        try{ const payload=typeof row.payload==='string'? JSON.parse(row.payload):row.payload; const recs=payload.records||payload.data||[]; recs.slice(0,3).forEach(rec=>{ const lat=parseFloat(rec.lat||rec.latitude||rec.y), lon=parseFloat(rec.lon||rec.longitude||rec.x); if(!isNaN(lat)&&!isNaN(lon)) L.marker([lat,lon]).addTo(markers).bindPopup(`<b>${row.sector}</b> ${row.resource_id.slice(0,8)}`); }); }catch(e){}
+      });
+    } else { renderSatellites(); }
+  }catch(e){ document.getElementById('datasets').textContent='offline — no backend. On Pages, datasets require hosted build/server.\n'+String(e); }
+}
+
+function setSector(s){
+  currentSector=s;
+  document.querySelectorAll('.tab').forEach(el=>el.classList.toggle('active',el.dataset.sector===s));
+  document.querySelectorAll('.sectorPanel').forEach(el=>el.classList.remove('active'));
+  const id='panel-'+s; const el=document.getElementById(id); if(el) el.classList.add('active');
+  // if general, show general, if space show space, etc. For general we also keep general visible
+  if(s==='general'){ document.getElementById('panel-general').classList.add('active'); }
+  if(s==='space'){ document.getElementById('panel-space').classList.add('active'); loadCached(); }
+  datasets();
+  updateMapDetails();
+}
+
+// events
+document.querySelectorAll('.tab').forEach(el=>el.onclick=()=>setSector(el.dataset.sector));
+document.getElementById('mapType').onchange=e=>setMapType(e.target.value);
+document.getElementById('toggle3d').onclick=()=>{
+  use3D=!use3D;
+  document.getElementById('toggle3d').textContent=use3D?'2D Leaflet':'3D Globe';
+  document.getElementById('map').style.display=use3D?'none':'block';
+  document.getElementById('globe').style.display=use3D?'block':'none';
+  if(use3D){ if(!globe) initGlobe(); updateGlobe(); }
+  updateMapDetails();
+};
+document.getElementById('loadCached').onclick=loadCached;
+document.getElementById('fetchLive').onclick=fetchLive;
 document.getElementById('refreshBtn').onclick=datasets;
 document.getElementById('fetchBtn').onclick=async()=>{
-  const resource_id=document.getElementById('resource_id').value.trim();
-  const limit=parseInt(document.getElementById('limit').value)||5;
-  const offset=parseInt(document.getElementById('offset').value)||0;
-  const sector=document.getElementById('sector').value;
+  const rid=document.getElementById('resource_id').value.trim(); const lim=parseInt(document.getElementById('limit').value)||5; const off=parseInt(document.getElementById('offset').value)||0;
   const out=document.getElementById('fetchOut');
-  if(!resource_id){ out.textContent='Enter resource_id'; return; }
+  if(!rid){ out.textContent='Enter resource_id'; return; }
   out.textContent='fetching…';
-  document.getElementById('fetchBtn').disabled=true;
-  try{
-    const r=await fetch('/api/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resource_id,limit,offset,sector})});
-    const t=await r.text();
-    out.textContent = `HTTP ${r.status}\n` + t.slice(0,6000);
-    if(r.ok) datasets(), health();
-  }catch(e){ out.textContent=String(e); }
-  document.getElementById('fetchBtn').disabled=false;
+  try{ const r=await fetch('/api/fetch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resource_id:rid,limit:lim,offset:off,sector:currentSector})}); const t=await r.text(); out.textContent=`HTTP ${r.status}\n`+t.slice(0,6000); if(r.ok) datasets(), health(); }catch(e){ out.textContent=String(e); }
 };
-health(); datasets(); setInterval(health,5000);
+
+initMap();
+health(); datasets(); setSector('general');
+setInterval(()=>{ if(use3D && tles.length) updateGlobe(); else if(tles.length && currentSector==='space') renderSatellites(); health(); },3000);
 </script>
 </body>
 </html>
