@@ -45,8 +45,8 @@ See `AGENTS.md:2` for architecture. Sector modules (power/agri/transport/space) 
 
 **GitHub Pages (Step 1 — done):**
 - `.github/workflows/pages.yml` deploys `static/` (Leaflet + OSM dashboard) to Pages on every `git push` to `main`.
-- After push: GitHub → Settings → Pages → Source: **GitHub Actions**. URL appears as `https://opbsuthar.github.io/project_C_osint/`.
-- Pages is **static-only** — it serves `index.html` with mocked/cached data but cannot run the C server (`src/server.c`), `/api/*` or SQLite.
+- After push: GitHub → Settings → Pages → Source: **GitHub Actions**. URL is `https://opbsuthar.github.io/BharatVista-Nexus/`.
+- Pages is **static-only** — it serves `static/index.html` (BharatVista Nexus viewer) but cannot run the C server (`src/server.c`), `/api/*` or SQLite.
 
 **Real-time C backend (Step 2 — next):**
 Host `build/server` where long-running processes are allowed. Example targets:
@@ -55,7 +55,7 @@ Host `build/server` where long-running processes are allowed. Example targets:
 - Keep rate-limit + caching per `AGENTS.md:3` — do NOT move backend to edge/serverless that bypasses SQLite cache.
 
 ## Git Remote
-Repo: `https://github.com/OPBSUTHAR/project_C_osint` — already pushed (`main`).
+Repo: `https://github.com/OPBSUTHAR/BharatVista-Nexus` (renamed from `project_C_osint`) — `main`.
 
 ```bash
 git remote -v

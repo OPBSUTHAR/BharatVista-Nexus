@@ -13,7 +13,7 @@ Build **BharatVista Nexus** — an enterprise-grade, high-performance **open-dat
 
 ## 2. Architecture (do not deviate without updating this file)
 ```
-project_C_osint/
+BharatVista-Nexus/  (local: project_C_osint)
 ├── src/          # C source: server.c, db.c, data_gov.c, geo.c, parser.c
 ├── include/      # headers: db.h, data_gov.h, geo.h, parser.h, server.h
 ├── static/       # index.html, app.js, style.css (Leaflet + OSM)
@@ -58,7 +58,7 @@ Windows native: use WSL or MinGW-w64 (`mingw32-make`).
 - Any other source MUST be explicitly allowlisted here with its ToS link before adding code.
 
 ## 7. Git & Delivery
-- Remote: `https://github.com/OPBSUTHAR/project_C_osint` — created via `gh repo create` and pushed (`main` branch).
+- Remote: `https://github.com/OPBSUTHAR/BharatVista-Nexus` — (was `project_C_osint`, renamed 2026-09-06) (`main` branch).
 - GitHub Pages (Step 1): `.github/workflows/pages.yml` deploys `static/` via `actions/deploy-pages@v4` on `push: main`. Enable in GitHub → Settings → Pages → Source: GitHub Actions. Pages is static-only (no C server/SQLite).
 - Real-time hosting (Step 2): C server (`build/server`) must run on a container/VM host (Azure/Fly/Render/VPS) with `DATA_GOV_IN_API_KEY` as secret; point Pages frontend to that base URL if needed.
 - Never commit `database/*.db`, `.env`, or API keys. Commit `schema.sql` + sample JSON in `database/samples/`.
